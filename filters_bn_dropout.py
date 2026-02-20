@@ -84,7 +84,7 @@ def accuracy(x, y, model):
     s = torch.sum((argmaxes == y).float()) / len(y)
     return s.cpu().numpy()
 
-def train_model(model, train_dl, n_epochs, device):
+def train_model(model, train_dl, n_epochs=5, device=device):
     loss_fn = nn.CrossEntropyLoss()
     opt = Adam(model.parameters(), lr=1e-3)
     losses, accuracies = [], []
@@ -118,8 +118,109 @@ def plot_results(filters, accuracy, xlabel, ylabel):
     plt.savefig(f"{xlabel}_vs_{ylabel}.png")
     plt.show()
 
+def get_cnn_bn(device, filters=25, kernel_size=3):
+    return nn.Sequential(
+        nn.Conv2d(1, filters, kernel_size=kernel_size),
+        nn.BatchNorm2d(filters),
+        nn.ReLU(),
+        nn.MaxPool2d(2),
+
+        nn.Conv2d(filters, filters, kernel_size=kernel_size),
+        nn.BatchNorm2d(filters),
+        nn.ReLU(),
+        nn.MaxPool2d(2),
+
+        nn.Flatten(),
+        nn.Linear(filters * 5 * 5, 200),
+        nn.BatchNorm1d(200),
+        nn.ReLU(),
+        nn.Linear(200, 10),
+    ).to(device)
+
+def get_cnn_dropout(device, filters=25, kernel_size=3, p=0.5):
+    return nn.Sequential(
+        nn.Conv2d(1, filters, kernel_size=kernel_size),
+        nn.ReLU(),
+        nn.Dropout2d(p),
+        nn.MaxPool2d(2),
+
+        nn.Conv2d(filters, filters, kernel_size=kernel_size),
+        nn.ReLU(),
+        nn.Dropout2d(p),
+        nn.MaxPool2d(2),
+
+        nn.Flatten(),
+        nn.Linear(filters * 5 * 5, 200),
+        nn.ReLU(),
+        nn.Dropout(p),
+        nn.Linear(200, 10),
+    ).to(device)
+
+
+def experiment_4():
+    base_model = get_cnnmodel(device, filters=25)
+    bn_model = get_cnn_bn(device)
+    dropout_model = get_cnn_dropout(device)
+    start_time = time.time()
+    base_losses, base_accs = train_model(base_model, train_dl_cnn)
+    end_time = time.time()
+    base_time = end_time - start_time
+    start_time = time.time()
+    bn_losses, bn_accs = train_model(bn_model, train_dl_cnn)
+    end_time = time.time()
+    bn_time = end_time - start_time
+    start_time = time.time()
+    dropout_losses, dropout_accs = train_model(dropout_model, train_dl_cnn)
+    end_time = time.time()
+    dropout_time = end_time - start_time
+
+    test_acc_base = []
+    test_acc_bn = []
+    test_acc_dropout = []
+    for batch in test_dl_cnn:
+        x, y = batch
+        test_acc_base.append(accuracy(x, y, base_model))
+        test_acc_bn.append(accuracy(x, y, bn_model))
+        test_acc_dropout.append(accuracy(x, y, dropout_model))
+    accuracies = [np.mean(test_acc_base), np.mean(test_acc_bn), np.mean(test_acc_dropout)]
+
+    plt.figure(figsize=(13, 3))
+    plt.subplot(121)
+    plt.title("Training Loss Across Models")
+    plt.plot(np.arange(len(base_losses)) + 1, base_losses, label='Base CNN')
+    plt.plot(np.arange(len(bn_losses)) + 1, bn_losses, label='Batch Norm CNN')
+    plt.plot(np.arange(len(dropout_losses)) + 1, dropout_losses, label='Dropout CNN')
+    plt.legend()
+
+    plt.subplot(122)
+    plt.title("Test Accuracy Across Models")
+    plt.plot(np.arange(len(base_accs)) + 1, base_accs, label='Base CNN')
+    plt.plot(np.arange(len(bn_accs)) + 1, bn_accs, label='Batch Norm CNN')
+    plt.plot(np.arange(len(dropout_accs)) + 1, dropout_accs, label='Dropout CNN')
+    plt.legend()
+    plt.savefig('experiment_4_results.png')
+    plt.show()
+
+    labels = ['Base CNN', 'Batch Norm CNN', 'Dropout CNN']
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    axes[0].bar(labels, accuracies)
+    axes[0].set_title("Test Accuracy")
+    axes[0].set_ylim(0, 1)
+    axes[0].set_ylabel("Accuracy")
+    
+    axes[1].bar(labels, [base_time, bn_time, dropout_time])
+    axes[1].set_title("Training Time")
+    axes[1].set_ylabel("Time (seconds)")
+
+    plt.tight_layout()
+    plt.savefig('experiment_4_comparison.png')
+    plt.show()
+
+
+
 
 if __name__ == "__main__":
+    """
     filters = [5, 10, 15, 20, 25]
     model_accuracy = []
     model_times = []
@@ -127,7 +228,7 @@ if __name__ == "__main__":
         print(f"Training CNN with {filter} filters")
         model = get_cnnmodel(device, filter)
         start_time = time.time()
-        train_model(model, train_dl_cnn, n_epochs=5, device=device)
+        train_model(model, train_dl_cnn)
         end_time = time.time()
         model_times.append(end_time - start_time)
         epoch_accuracies = []
@@ -139,6 +240,8 @@ if __name__ == "__main__":
         print(f"accuracy for filter {filter} is {model_accuracy[-1]}")
     plot_results(filters, model_accuracy, "Number of Filters", "Test Accuracy")
     plot_results(filters, model_times, "Number of Filters", "Training Time (seconds)")
+    """
+    experiment_4()
 
     
 
