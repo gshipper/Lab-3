@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 fmnist_train = datasets.FashionMNIST('~/data/FMNIST', download=True, train=True)
 fmnist_test = datasets.FashionMNIST('~/data/FMNIST', download=True, train=False)
@@ -41,9 +43,6 @@ train_dl_cnn = DataLoader(train_dataset_cnn, batch_size=32, shuffle=True)
 test_dataset_cnn = FMNISTDataset_CNN(x_test, y_test)
 test_dl_cnn = DataLoader(test_dataset_cnn, batch_size=32, shuffle=True)
 
-
-
-
 def get_mlp_model(device):
     model = nn.Sequential(
         nn.Linear(28 * 28, 1000),
@@ -52,7 +51,7 @@ def get_mlp_model(device):
     ).to(device)
     return model
 
-def get_cnnmodel(device):
+def get_cnn_model(device):
     model = nn.Sequential(nn.Conv2d( 1,64,kernel_size =3),
         nn.ReLU(),
         nn.MaxPool2d( 2),
@@ -63,7 +62,7 @@ def get_cnnmodel(device):
         nn.Linear( 3200, 200),
         nn.ReLU(),
         nn.Linear( 200, 10)
-).to(device)
+    ).to(device)
     return model
 
 def train_batch(x, y, model, opt, loss_fn):
@@ -107,3 +106,73 @@ def train_model(model, train_dl, n_epochs, device):
         accuracies.append(epoch_accuracy)
 
     return losses, accuracies
+
+def test_model(model, test_dl):
+    test_accs = []
+    for batch in test_dl:
+        x, y = batch
+        batch_acc = accuracy(x, y, model)
+        test_accs.append(batch_acc)
+    return np.mean(test_accs)
+
+
+def count_parameters(model):
+        """
+        Counts the number of parameters in a PyTorch model.
+        """
+        total = 0
+
+        # Iterate over all parameters in the model and sum their sizes
+        for p in model.parameters():
+            total += p.numel()
+        return total
+
+
+
+def experiment_1(n_epochs=5):
+
+    # train MLP
+    mlp = get_mlp_model(device)
+    print(f"MLP has {count_parameters(mlp)} parameters")
+    start = time.time()
+    mlp_losses, mlp_train_accs = train_model(mlp, train_dl, n_epochs, device)
+    mlp_time = time.time() - start
+    # test accuracy on MLP
+    mlp_test_acc = test_model(mlp, test_dl)
+    print(f"MLP test accuracy: {mlp_test_acc:.4f}")
+
+    # train CNN
+    cnn = get_cnn_model(device)
+    print(f"CNN has {count_parameters(cnn)} parameters")
+    start = time.time()
+    cnn_losses, cnn_train_accs = train_model(cnn, train_dl_cnn, n_epochs, device)
+    cnn_time = time.time() - start
+    cnn_test_acc = test_model(cnn, test_dl_cnn)
+    print(f"CNN test accuracy: {cnn_test_acc:.4f}")
+
+    print(f"MLP training time: {mlp_time:.2f}s")
+    print(f"CNN training time: {cnn_time:.2f}s")
+
+    # plot results
+    plt.figure(figsize=(13, 3))
+
+    plt.subplot(121)
+    plt.title('Training Loss value over epochs CNN vs MLP')
+    plt.plot(np.arange(n_epochs) + 1, mlp_losses, label='MLP')
+    plt.plot(np.arange(n_epochs) + 1, cnn_losses, label='CNN')
+    plt.legend()
+
+    plt.subplot(122)
+    plt.title('Testing Accuracy value over epochs CNN vs MLP')
+    plt.plot(np.arange(n_epochs) + 1, mlp_train_accs, label='MLP')
+    plt.plot(np.arange(n_epochs) + 1, cnn_train_accs, label='CNN')
+    plt.legend()
+
+    plt.savefig('study1_results.png')
+    plt.show()
+
+
+
+if __name__ == "__main__":
+    
+    experiment_1()
