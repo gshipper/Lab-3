@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 fmnist_train = datasets.FashionMNIST('~/data/FMNIST', download=True, train=True)
 fmnist_test = datasets.FashionMNIST('~/data/FMNIST', download=True, train=False)
@@ -114,16 +115,21 @@ def plot_results(filters, accuracy, xlabel, ylabel):
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(f"{xlabel} vs {ylabel}")
+    plt.savefig(f"{xlabel}_vs_{ylabel}.png")
     plt.show()
 
 
 if __name__ == "__main__":
     filters = [5, 10, 15, 20, 25]
     model_accuracy = []
+    model_times = []
     for filter in filters:
         print(f"Training CNN with {filter} filters")
         model = get_cnnmodel(device, filter)
+        start_time = time.time()
         train_model(model, train_dl_cnn, n_epochs=5, device=device)
+        end_time = time.time()
+        model_times.append(end_time - start_time)
         epoch_accuracies = []
         for batch in test_dl_cnn:
             x, y = batch
@@ -132,6 +138,7 @@ if __name__ == "__main__":
         model_accuracy.append(np.mean(epoch_accuracies))
         print(f"accuracy for filter {filter} is {model_accuracy[-1]}")
     plot_results(filters, model_accuracy, "Number of Filters", "Test Accuracy")
+    plot_results(filters, model_times, "Number of Filters", "Training Time (seconds)")
 
     
 
